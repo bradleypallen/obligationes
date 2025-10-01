@@ -94,7 +94,7 @@ python -m obligationes --help
 - [x] **Phase 1**: Core state management and data structures
 - [x] **Phase 2**: LLM inference engine
 - [x] **Phase 3**: Rules engine (Burley's rules)
-- [x] **Phase 4**: Agent implementation (Opponent, Respondent, Judge)
+- [x] **Phase 4**: Agent implementation (Opponent, Respondent)
 - [x] **Phase 5**: Disputation manager
 - [x] **Phase 6**: CLI interface
 - [x] **Phase 7**: Testing and validation
@@ -121,7 +121,7 @@ obligationes/
 │   ├── state.py          # State management (✓ complete)
 │   ├── inference.py      # LLM inference engine (✓ complete)
 │   ├── rules.py          # Burley's rules (✓ complete)
-│   ├── agents.py         # Opponent/Respondent/Judge (✓ complete)
+│   ├── agents.py         # Opponent/Respondent agents (✓ complete)
 │   ├── manager.py        # Disputation orchestration (✓ complete)
 │   ├── cli.py            # Command-line interface (✓ complete)
 │   └── __main__.py       # Package entry point (✓ complete)

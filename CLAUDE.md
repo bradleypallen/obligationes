@@ -19,7 +19,7 @@ The system uses a **layered architecture** with clear separation of concerns:
 
 ### Core Components
 
-- **DisputationManager**: Main orchestrator with three agents (Opponent, Respondent, Judge)
+- **DisputationManager**: Main orchestrator with two agents (Opponent, Respondent)
 - **LogicalReasoningEngine**: Uses LLMs for inference, consistency checking, and compatibility analysis
 - **RulesEngine (BurleyEvaluator)**: Applies Burley's 5 rules in strict precedence order
 - **StateManager**: Maintains immutable state transitions with CommitmentStore, PropositionHistory, and ConsistencyMonitor
@@ -28,7 +28,7 @@ The system uses a **layered architecture** with clear separation of concerns:
 ### Key Design Decisions
 
 - **LLM-Centric Logic**: All logical reasoning uses LLMs (GPT-4/Claude) rather than symbolic engines, enabling sophisticated natural language inference at the cost of non-determinism
-- **Separate Agents**: Opponent, Respondent, and Judge are distinct agents with different prompting strategies
+- **Separate Agents**: Opponent and Respondent are distinct agents with different prompting strategies (strategic vs. rule-following)
 - **State Immutability**: State updates are treated as immutable transitions for debugging, replay, and analysis
 - **Temperature=0**: Used throughout for consistency and determinism
 - **Structured Output**: All LLM responses use JSON format for reliable parsing
@@ -106,7 +106,7 @@ The `ObligationesState` maintains:
 ### Prompt Engineering Constraints
 - System prompts must emphasize rule-following over strategy for Respondent
 - Opponent prompts should focus on finding multi-step trap sequences
-- Judge prompts evaluate rule compliance and determine winners
+- Winner determination is mechanical (contradiction detected = Opponent wins)
 - All prompts use temperature=0 for consistency
 - JSON output format enforced via structured prompts
 
@@ -123,7 +123,7 @@ The `ObligationesState` maintains:
 - `obligationes/state.py`: State management data structures (✅ complete)
 - `obligationes/inference.py`: LLM-based logical reasoning engine (✅ complete)
 - `obligationes/rules.py`: Burley's rules implementation (✅ complete)
-- `obligationes/agents.py`: Opponent, Respondent, Judge agents (✅ complete)
+- `obligationes/agents.py`: Opponent and Respondent agents (✅ complete)
 - `obligationes/manager.py`: DisputationManager orchestrator (✅ complete)
 - `obligationes/cli.py`: Command-line interface with colored output (✅ complete)
 - `obligationes/__main__.py`: Package entry point (✅ complete)
@@ -162,9 +162,9 @@ python -m obligationes --help                  # Show all commands
 
 **Implemented Test Suite** (102 tests, all passing):
 - **Unit Tests**: Individual inference patterns, rule precedence, state management
-- **Integration Tests**: Complete disputation flows with all three agents
-- **Agent Tests**: Respondent rule-following, Opponent strategy, Judge evaluation
-- **Manager Tests**: Full orchestration, transcript save/load, status tracking
+- **Integration Tests**: Complete disputation flows with both agents
+- **Agent Tests**: Respondent rule-following, Opponent strategy and planning
+- **Manager Tests**: Full orchestration, transcript save/load, status tracking, mechanical winner determination
 - **Real LLM Testing**: All tests use real API calls (gpt-4o-mini for speed)
 - **Code Quality**: black, mypy, ruff all passing
 
