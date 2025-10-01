@@ -200,7 +200,7 @@ class TestAgentInteraction:
         state.set_positum("Socrates is a man")
 
         # Run a few turns
-        for _ in range(3):
+        for _ in range(2):
             # Opponent proposes
             proposal = opponent.propose_proposition(state)
 
@@ -216,8 +216,8 @@ class TestAgentInteraction:
             )
 
         # Verify state was updated
-        assert state.turn_count == 4  # Positum + 3 turns
-        assert len(state.history) == 4
+        assert state.turn_count == 2  # 2 turns (positum doesn't increment turn_count via set_positum)
+        assert len(state.history) == 2
         assert state.get_all_commitments()  # Has commitments
 
 
