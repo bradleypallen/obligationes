@@ -15,7 +15,6 @@ from obligationes.rules import BurleyRulesEngine
 from obligationes.agents import (
     RespondentAgent,
     OpponentAgent,
-    JudgeAgent,
     OpponentStrategy,
 )
 
@@ -27,8 +26,9 @@ class DisputationConfig:
     max_turns: int = 10
     opponent_strategy: OpponentStrategy = OpponentStrategy.BALANCED
     verbose: bool = True
-    model_name: str = "gpt-4"
+    model_name: str = "gpt-4o-mini"
     temperature: float = 0.0
+    vendor: Optional[str] = None  # "openai", "anthropic", or None for auto-detect
 
 
 @dataclass
@@ -69,13 +69,12 @@ class DisputationManager:
     1. Initialization with positum and common knowledge
     2. Turn-by-turn exchanges between Opponent and Respondent
     3. Consistency checking after each turn
-    4. Final judgment
+    4. Winner determination based on contradiction detection
 
     Attributes:
         state: Current disputation state
         respondent: Respondent agent
         opponent: Opponent agent
-        judge: Judge agent
         config: Disputation configuration
     """
 
@@ -104,7 +103,9 @@ class DisputationManager:
 
         # Create or use provided inference engine
         self.inference_engine = inference_engine or LLMInferenceEngine(
-            model_name=self.config.model_name, temperature=self.config.temperature
+            model_name=self.config.model_name,
+            temperature=self.config.temperature,
+            vendor=self.config.vendor,
         )
 
         # Create rules engine
@@ -118,7 +119,6 @@ class DisputationManager:
             strategy=self.config.opponent_strategy,
             inference_engine=self.inference_engine,
         )
-        self.judge = JudgeAgent(inference_engine=self.inference_engine)
 
         # Track timing
         self.start_time: Optional[datetime] = None
@@ -147,7 +147,69 @@ class DisputationManager:
             print(f"Max Turns: {self.config.max_turns}")
             print(f"\n{'='*70}\n")
 
+        # Turn 0: Check if positum is self-contradictory (per Novaes 2005)
+        # R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if self-contradictory)
+        # R(φ₀) = 1 iff φ₀ ⊬⊥ (accept if not self-contradictory)
+        if self.config.verbose:
+            print(f"\n--- Turn 0 (Positum) ---\n")
+            print(f"Opponent proposes: {positum}")
+
+        # Check if positum is self-contradictory
+        positum_self_contradictory, contradiction_reasoning = (
+            self.inference_engine.is_self_contradictory(positum)
+        )
+
+        from obligationes.state import ResponseType
+
+        if positum_self_contradictory:
+            # Positum is self-contradictory - reject it
+            if self.config.verbose:
+                print(f"\nRespondent: NEGO")
+                print(f"Reasoning: The positum is self-contradictory and cannot be defended. {contradiction_reasoning}")
+                print(f"Rule Applied: Positum rejection (self-contradictory)")
+                print("\n❌ DISPUTATION CANNOT BEGIN - POSITUM REJECTED")
+
+            # End immediately - no game starts
+            self.end_time = datetime.utcnow()
+            duration = (self.end_time - self.start_time).total_seconds()
+
+            # Create result indicating no game - Respondent wins by correctly rejecting invalid positum
+            return DisputationResult(
+                winner="RESPONDENT",
+                reason="Positum was self-contradictory and correctly rejected",
+                positum=positum,
+                total_turns=0,
+                final_consistent=True,
+                transcript=[],
+                judgment={
+                    "winner": "RESPONDENT",
+                    "reason": "Positum was self-contradictory and correctly rejected",
+                    "rule_violations": [],
+                    "key_moments": ["Positum rejected as self-contradictory"],
+                    "overall_assessment": "Disputation could not begin due to self-contradictory positum. Respondent correctly rejected it.",
+                    "final_consistent": True,
+                },
+                state=self.state,
+                started_at=self.start_time.isoformat(),
+                ended_at=self.end_time.isoformat(),
+                duration_seconds=duration,
+            )
+
+        # Positum is not self-contradictory - accept it
+        if self.config.verbose:
+            print(f"\nRespondent: CONCEDO")
+            print(f"Reasoning: The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position.")
+            print(f"Rule Applied: Positum acceptance (non-contradictory)")
+
+        # Set positum and record the CONCEDO response
         self.state.set_positum(positum)
+        self.state.add_response(
+            positum,
+            ResponseType.CONCEDO,
+            "The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position.",
+            0,  # Rule 0 = positum acceptance
+        )
+        self.state.history[-1].consistency_maintained = True
 
         # Run disputation loop
         contradiction_found = False
@@ -184,10 +246,18 @@ class DisputationManager:
             )
 
             # Check consistency
+            # Build full commitment set: CONCEDO + negation of NEGO
             all_commitments = self.state.get_all_commitments()
-            if len(all_commitments) > 1:
+            all_negations = self.state.get_all_negations()
+
+            # Add negated versions of NEGO responses to the commitment set
+            full_commitment_set = all_commitments.copy()
+            for negated_prop in all_negations:
+                full_commitment_set.add(f"NOT({negated_prop})")
+
+            if len(full_commitment_set) > 1:
                 consistent, contradictions, reasoning = (
-                    self.inference_engine.check_consistency(all_commitments)
+                    self.inference_engine.check_consistency(full_commitment_set)
                 )
 
                 if not consistent:
@@ -216,27 +286,27 @@ class DisputationManager:
 
         self.state.end_disputation(winner, reason)
 
-        # Get judge's evaluation
-        judgment = self.judge.judge_disputation(self.state)
-
         if self.config.verbose:
             print(f"\n{'='*70}")
-            print("JUDGMENT")
+            print("FINAL RESULT")
             print(f"{'='*70}")
-            print(f"\nWinner: {judgment['winner']}")
-            print(f"Reason: {judgment['reason']}")
-            print(f"\nOverall Assessment: {judgment['overall_assessment']}")
+            print(f"\nWinner: {winner}")
+            print(f"Reason: {reason}")
             print(f"\n{'='*70}\n")
 
         # Create result
         return DisputationResult(
-            winner=judgment["winner"],
-            reason=judgment["reason"],
+            winner=winner,
+            reason=reason,
             positum=positum,
             total_turns=self.state.turn_count,
-            final_consistent=judgment["final_consistent"],
+            final_consistent=not contradiction_found,
             transcript=self._format_transcript(),
-            judgment=judgment,
+            judgment={
+                "winner": winner,
+                "reason": reason,
+                "final_consistent": not contradiction_found,
+            },
             state=self.state,
             started_at=self.start_time.isoformat(),
             ended_at=self.end_time.isoformat(),

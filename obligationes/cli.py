@@ -42,7 +42,7 @@ def print_header(text: str) -> None:
     click.echo(f"{Colors.BOLD}{Colors.CYAN}{'='*70}{Colors.RESET}\n")
 
 
-def print_turn(turn_num: int) -> None:
+def print_turn(turn_num) -> None:
     """Print a turn header."""
     click.echo(f"\n{Colors.BOLD}{Colors.YELLOW}--- Turn {turn_num} ---{Colors.RESET}\n")
 
@@ -133,7 +133,17 @@ def cli():
     help="Opponent strategy (default: balanced)",
 )
 @click.option(
-    "--model", "-m", default="gpt-4", help="LLM model to use (default: gpt-4)"
+    "--model",
+    "-m",
+    default="gpt-4o-mini",
+    help="LLM model to use (default: gpt-4o-mini). Examples: gpt-4, gpt-4o-mini, claude-3-5-sonnet-20241022",
+)
+@click.option(
+    "--vendor",
+    "-v",
+    type=click.Choice(["openai", "anthropic", "auto"], case_sensitive=False),
+    default="auto",
+    help="LLM vendor (default: auto-detect from model name)",
 )
 @click.option("--output", "-o", type=click.Path(), help="Save transcript to JSON file")
 @click.option(
@@ -148,6 +158,7 @@ def run(
     max_turns: int,
     strategy: str,
     model: str,
+    vendor: str,
     output: Optional[str],
     quiet: bool,
     no_color: bool,
@@ -181,6 +192,7 @@ def run(
         verbose=not quiet,
         model_name=model,
         temperature=0.0,
+        vendor=None if vendor == "auto" else vendor,
     )
 
     # Create manager
@@ -200,59 +212,123 @@ def run(
         # Override manager's verbose output with our colored version
         manager.config.verbose = False  # Disable default output
 
-        # Initialize
-        manager.state.set_positum(positum)
-        manager.start_time = (
-            manager.start_time or __import__("datetime").datetime.utcnow()
+        # Start timing
+        manager.start_time = __import__("datetime").datetime.utcnow()
+
+        # Turn 0: Check if positum is self-contradictory (per Novaes 2005)
+        # R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if self-contradictory)
+        # R(φ₀) = 1 iff φ₀ ⊬⊥ (accept if not self-contradictory)
+        print_turn("0 (Positum)")
+        click.echo(f"{Colors.BOLD}{Colors.RED}Opponent proposes:{Colors.RESET} {positum}")
+
+        # Check if positum is self-contradictory
+        positum_self_contradictory, contradiction_reasoning = (
+            manager.inference_engine.is_self_contradictory(positum)
         )
 
-        # Run disputation loop manually for colored output
-        contradiction_found = False
-        for turn in range(max_turns):
-            print_turn(turn + 1)
+        from obligationes.state import ResponseType
 
-            # Opponent proposes
-            proposal = manager.opponent.propose_proposition(manager.state)
-            print_opponent(proposal["proposition"], proposal["strategy_note"])
-
-            # Respondent evaluates
-            evaluation = manager.respondent.evaluate_proposition(
-                proposal["proposition"], manager.state
-            )
+        if positum_self_contradictory:
+            # Positum is self-contradictory - reject it
             print_respondent(
-                evaluation["response"].value.upper(),
-                evaluation["reasoning"],
-                evaluation["rule_applied"],
+                "NEGO",
+                f"The positum is self-contradictory and cannot be defended. {contradiction_reasoning}",
+                0,  # Rule 0 = positum rejection
             )
+            print_contradiction()
+            click.echo(f"\n{Colors.BOLD}{Colors.RED}DISPUTATION CANNOT BEGIN - POSITUM REJECTED{Colors.RESET}")
 
-            if evaluation["trap_detected"]:
-                print_trap(evaluation["trap_analysis"])
+            # End timing
+            manager.end_time = __import__("datetime").datetime.utcnow()
 
-            # Update state
-            manager.state.add_response(
-                proposal["proposition"],
-                evaluation["response"],
-                evaluation["reasoning"],
-                evaluation["rule_applied"],
-            )
+            # Show rejection result - Respondent wins by correctly rejecting invalid positum
+            print_header("FINAL RESULT")
+            click.echo(f"{Colors.BOLD}Winner:{Colors.RESET} {Colors.GREEN}{Colors.BOLD}RESPONDENT{Colors.RESET}")
+            click.echo(f"{Colors.BOLD}Reason:{Colors.RESET} Positum was self-contradictory and correctly rejected")
+            click.echo(f"\n{Colors.CYAN}{'='*70}{Colors.RESET}\n")
 
-            # Check consistency
-            all_commitments = manager.state.get_all_commitments()
-            if len(all_commitments) > 1:
-                consistent, contradictions, reasoning = (
-                    manager.inference_engine.check_consistency(all_commitments)
+            # Save transcript if requested
+            if output:
+                output_path = Path(output)
+                manager.save_transcript(str(output_path))
+                click.echo(f"\n{Colors.GREEN}✓{Colors.RESET} Transcript saved to {output_path}")
+
+            return
+
+        # Positum is not self-contradictory - accept it
+        print_respondent(
+            "CONCEDO",
+            "The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position.",
+            0,  # Rule 0 = positum acceptance
+        )
+
+        # Set positum and record the CONCEDO response
+        manager.state.set_positum(positum)
+        manager.state.add_response(
+            positum,
+            ResponseType.CONCEDO,
+            "The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position.",
+            0,
+        )
+        manager.state.history[-1].consistency_maintained = True
+
+        contradiction_found = False
+
+        # Run disputation loop manually for colored output (if not already contradicted)
+        if not contradiction_found:
+            for turn in range(max_turns):
+                print_turn(turn + 1)
+
+                # Opponent proposes
+                proposal = manager.opponent.propose_proposition(manager.state)
+                print_opponent(proposal["proposition"], proposal["strategy_note"])
+
+                # Respondent evaluates
+                evaluation = manager.respondent.evaluate_proposition(
+                    proposal["proposition"], manager.state
+                )
+                print_respondent(
+                    evaluation["response"].value.upper(),
+                    evaluation["reasoning"],
+                    evaluation["rule_applied"],
                 )
 
-                if not consistent:
-                    contradiction_found = True
-                    print_contradiction()
-                    click.echo(
-                        f"{Colors.RED}Contradictions:{Colors.RESET} {contradictions}"
+                if evaluation["trap_detected"]:
+                    print_trap(evaluation["trap_analysis"])
+
+                # Update state
+                manager.state.add_response(
+                    proposal["proposition"],
+                    evaluation["response"],
+                    evaluation["reasoning"],
+                    evaluation["rule_applied"],
+                )
+
+                # Check consistency
+                # Build full commitment set: CONCEDO + negation of NEGO
+                all_commitments = manager.state.get_all_commitments()
+                all_negations = manager.state.get_all_negations()
+
+                # Add negated versions of NEGO responses to the commitment set
+                full_commitment_set = all_commitments.copy()
+                for negated_prop in all_negations:
+                    full_commitment_set.add(f"NOT({negated_prop})")
+
+                if len(full_commitment_set) > 1:
+                    consistent, contradictions, reasoning = (
+                        manager.inference_engine.check_consistency(full_commitment_set)
                     )
-                    manager.state.history[-1].consistency_maintained = False
-                    break
-                else:
-                    manager.state.history[-1].consistency_maintained = True
+
+                    if not consistent:
+                        contradiction_found = True
+                        print_contradiction()
+                        click.echo(
+                            f"{Colors.RED}Contradictions:{Colors.RESET} {contradictions}"
+                        )
+                        manager.state.history[-1].consistency_maintained = False
+                        break
+                    else:
+                        manager.state.history[-1].consistency_maintained = True
 
         # End timing
         manager.end_time = __import__("datetime").datetime.utcnow()
@@ -267,9 +343,14 @@ def run(
 
         manager.state.end_disputation(winner, reason)
 
-        # Get judge's evaluation
-        judgment = manager.judge.judge_disputation(manager.state)
-        print_judgment(judgment)
+        # Print final result
+        print_judgment({
+            "winner": winner,
+            "reason": reason,
+            "overall_assessment": f"Disputation completed with {manager.state.turn_count} turns.",
+            "key_moments": [],
+            "rule_violations": [],
+        })
 
         # Show timing
         duration = (manager.end_time - manager.start_time).total_seconds()
@@ -365,10 +446,7 @@ def info():
         f"  {Colors.BLUE}• Respondent:{Colors.RESET} Defends the positum (initial position)"
     )
     click.echo(
-        f"  {Colors.RED}• Opponent:{Colors.RESET} Proposes propositions to force contradictions"
-    )
-    click.echo(
-        f"  {Colors.CYAN}• Judge:{Colors.RESET} Evaluates the disputation and determines the winner\n"
+        f"  {Colors.RED}• Opponent:{Colors.RESET} Proposes propositions to force contradictions\n"
     )
 
     click.echo(f"{Colors.BOLD}Response Types:{Colors.RESET}")

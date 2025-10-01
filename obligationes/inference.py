@@ -71,6 +71,28 @@ class ConsistencyResult(BaseModel):
     )
 
 
+class SemanticEquivalenceResult(BaseModel):
+    """Result of checking semantic equivalence between two propositions."""
+
+    equivalent: bool = Field(
+        description="Whether the two propositions are semantically equivalent"
+    )
+    reasoning: str = Field(
+        description="Explanation of why they are or are not equivalent"
+    )
+
+
+class SelfContradictionResult(BaseModel):
+    """Result of checking if a single proposition is self-contradictory."""
+
+    self_contradictory: bool = Field(
+        description="Whether the proposition is internally self-contradictory"
+    )
+    reasoning: str = Field(
+        description="Explanation of why it is or is not self-contradictory"
+    )
+
+
 class LLMInferenceEngine:
     """
     LLM-based logical reasoning engine.
@@ -89,6 +111,7 @@ class LLMInferenceEngine:
         model_name: str = "gpt-4",
         temperature: float = 0.0,
         api_key: Optional[str] = None,
+        vendor: Optional[str] = None,
     ):
         """
         Initialize the inference engine.
@@ -97,29 +120,41 @@ class LLMInferenceEngine:
             llm: Pre-configured LLM instance (if None, creates default)
             model_name: Name of the model to use (gpt-4, claude-3-opus-20240229, etc.)
             temperature: Temperature for LLM calls (0.0 for deterministic)
-            api_key: API key for the LLM provider
+            api_key: API key for the LLM provider (if None, uses env vars)
+            vendor: Vendor to use ("openai", "anthropic", or None for auto-detect)
         """
+        import os
+
         self.temperature = temperature
 
         if llm is not None:
             self.llm = llm
         else:
-            # Auto-detect LLM type from model name
-            if "gpt" in model_name.lower():
-                kwargs = {"model": model_name, "temperature": temperature}
-                if api_key is not None:
-                    kwargs["api_key"] = api_key
-                self.llm = ChatOpenAI(**kwargs)
-            elif "claude" in model_name.lower():
-                kwargs = {"model": model_name, "temperature": temperature}
-                if api_key is not None:
-                    kwargs["api_key"] = api_key
+            # Determine vendor
+            if vendor is None or vendor == "auto":
+                # Auto-detect from model name
+                if "gpt" in model_name.lower() or "o1" in model_name.lower():
+                    vendor = "openai"
+                elif "claude" in model_name.lower():
+                    vendor = "anthropic"
+                else:
+                    vendor = "openai"  # Default
+
+            # Get API key from environment if not provided
+            if api_key is None:
+                if vendor == "openai":
+                    api_key = os.getenv("OPENAI_API_KEY")
+                elif vendor == "anthropic":
+                    api_key = os.getenv("ANTHROPIC_API_KEY")
+
+            # Create LLM instance
+            kwargs = {"model": model_name, "temperature": temperature}
+            if api_key is not None:
+                kwargs["api_key"] = api_key
+
+            if vendor == "anthropic":
                 self.llm = ChatAnthropic(**kwargs)
-            else:
-                # Default to GPT-4
-                kwargs = {"model": "gpt-4", "temperature": temperature}
-                if api_key is not None:
-                    kwargs["api_key"] = api_key
+            else:  # Default to OpenAI
                 self.llm = ChatOpenAI(**kwargs)
 
         # Create output parsers
@@ -130,11 +165,19 @@ class LLMInferenceEngine:
         self.consistency_parser = PydanticOutputParser(
             pydantic_object=ConsistencyResult
         )
+        self.equivalence_parser = PydanticOutputParser(
+            pydantic_object=SemanticEquivalenceResult
+        )
+        self.self_contradiction_parser = PydanticOutputParser(
+            pydantic_object=SelfContradictionResult
+        )
 
         # Create chains
         self._follows_chain = self._create_follows_chain()
         self._incompatible_chain = self._create_incompatible_chain()
         self._consistency_chain = self._create_consistency_chain()
+        self._equivalence_chain = self._create_equivalence_chain()
+        self._self_contradiction_chain = self._create_self_contradiction_chain()
 
     def follows_from(
         self, proposition: str, premises: Set[str]
@@ -236,6 +279,73 @@ class LLMInferenceEngine:
 
         except Exception as e:
             return True, [], f"Error in consistency check: {str(e)}"
+
+    def is_self_contradictory(self, proposition: str) -> Tuple[bool, str]:
+        """
+        Check if a single proposition is internally self-contradictory.
+
+        This checks whether the proposition itself contains a logical contradiction,
+        such as "Socrates is both mortal and immortal" or "X is true and X is false".
+
+        Args:
+            proposition: The proposition to check
+
+        Returns:
+            Tuple of (self_contradictory, reasoning)
+        """
+        try:
+            result = self._self_contradiction_chain.invoke(
+                {
+                    "proposition": proposition,
+                    "format_instructions": self.self_contradiction_parser.get_format_instructions(),
+                }
+            )
+
+            # Parse the result
+            content = result.content if hasattr(result, "content") else str(result)
+            parsed = self._parse_self_contradiction_result(content)
+            return parsed.self_contradictory, parsed.reasoning
+
+        except Exception as e:
+            return False, f"Error in self-contradiction check: {str(e)}"
+
+    def semantically_equivalent(
+        self, prop1: str, prop2: str
+    ) -> Tuple[bool, str]:
+        """
+        Check if two propositions are semantically equivalent.
+
+        This is used to detect when the Opponent proposes logically identical
+        propositions with different wording (e.g., "A and B" vs "B and A").
+
+        Args:
+            prop1: First proposition
+            prop2: Second proposition
+
+        Returns:
+            Tuple of (equivalent, reasoning)
+        """
+        # Quick check: if exactly the same, they're equivalent
+        if prop1.strip().lower() == prop2.strip().lower():
+            return True, "Propositions are identical"
+
+        try:
+            result = self._equivalence_chain.invoke(
+                {
+                    "prop1": prop1,
+                    "prop2": prop2,
+                    "format_instructions": self.equivalence_parser.get_format_instructions(),
+                }
+            )
+
+            # Parse the result
+            content = result.content if hasattr(result, "content") else str(result)
+            parsed = self._parse_equivalence_result(content)
+            return parsed.equivalent, parsed.reasoning
+
+        except Exception as e:
+            # On error, assume not equivalent (conservative)
+            return False, f"Error in equivalence check: {str(e)}"
 
     def _create_follows_chain(self) -> Any:
         """Create the chain for checking logical inference."""
@@ -344,15 +454,23 @@ CRITICAL DEFINITION: "Logically consistent" means:
 - NO logical contradiction can be derived from the set
 - The propositions are mutually compatible
 
+NOTATION:
+- "NOT(P)" means the negation of proposition P
+- If you see both "P" and "NOT(P)", that's a direct contradiction
+- "NOT(A and B)" is logically equivalent to "NOT(A) or NOT(B)" (De Morgan's law)
+- "NOT(A or B)" is logically equivalent to "NOT(A) and NOT(B)" (De Morgan's law)
+
 Check for:
-1. Direct contradictions: "P" and "not P" in the set
-2. Indirect contradictions: Derived through valid inference
-3. Circular contradictions: A chain of inferences leading to contradiction
+1. Direct contradictions: "P" and "NOT(P)" in the set
+2. Indirect contradictions: Derived through valid inference (modus ponens, etc.)
+3. De Morgan contradictions: e.g., "NOT(A and B)" with "NOT(A or B)"
+4. Circular contradictions: A chain of inferences leading to contradiction
 
 IMPORTANT:
 - ALL propositions must be considered together
 - A set is inconsistent if ANY contradiction exists
 - Report ALL contradictory pairs found
+- Pay special attention to De Morgan's laws when analyzing NOT() propositions
 
 {format_instructions}""",
                 ),
@@ -362,6 +480,94 @@ IMPORTANT:
 {propositions}
 
 Is this set of propositions logically consistent?""",
+                ),
+            ]
+        )
+
+        return prompt | self.llm
+
+    def _create_equivalence_chain(self) -> Any:
+        """Create the chain for checking semantic equivalence."""
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are an expert in formal logic and natural language semantics.
+
+Your task is to determine if two propositions are SEMANTICALLY EQUIVALENT.
+
+CRITICAL DEFINITION: "Semantically equivalent" means:
+- Both propositions express the SAME logical content
+- They have the SAME truth conditions
+- One can be substituted for the other without changing logical meaning
+
+Common equivalences to recognize:
+1. Commutative: "A and B" ≡ "B and A"
+2. Commutative: "A or B" ≡ "B or A"
+3. Double negation: "not not P" ≡ "P"
+4. Synonyms: "Socrates is mortal" ≡ "Socrates will die"
+5. Rephrasing: "All men are mortal" ≡ "Every man is mortal"
+
+NOT equivalent:
+- Different logical structure: "A and B" ≠ "A or B"
+- Different subjects: "Socrates is wise" ≠ "Plato is wise"
+- Different predicates: "Socrates is mortal" ≠ "Socrates is wise"
+
+{format_instructions}""",
+                ),
+                (
+                    "human",
+                    """Proposition 1: {prop1}
+
+Proposition 2: {prop2}
+
+Are these propositions semantically equivalent?""",
+                ),
+            ]
+        )
+
+        return prompt | self.llm
+
+    def _create_self_contradiction_chain(self) -> Any:
+        """Create the chain for checking self-contradiction."""
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are an expert in formal logic specializing in detecting contradictions.
+
+Your task is to determine if a SINGLE proposition is INTERNALLY SELF-CONTRADICTORY.
+
+CRITICAL DEFINITION: "Self-contradictory" means:
+- The proposition asserts something AND its negation simultaneously
+- The proposition cannot possibly be true under any circumstances
+- The proposition contains mutually exclusive properties or states
+
+Examples of SELF-CONTRADICTORY propositions:
+1. "Socrates is both mortal and immortal" (mutually exclusive properties)
+2. "X is true and X is false" (direct contradiction)
+3. "The square circle exists" (contradictory definition)
+4. "I am my own grandfather" (logical impossibility)
+5. "All bachelors are married" (contradicts definition of bachelor)
+
+Examples of NOT self-contradictory propositions:
+1. "Socrates is mortal" (could be true or false, but not contradictory)
+2. "The sky is green" (false but not contradictory)
+3. "2+2=5" (false but not logically contradictory in itself)
+4. "God exists" (controversial but not self-contradictory)
+
+IMPORTANT: A proposition is only self-contradictory if it INTERNALLY contains a contradiction.
+It is NOT self-contradictory merely because it contradicts external common knowledge or other propositions.
+
+{format_instructions}""",
+                ),
+                (
+                    "human",
+                    """Proposition: {proposition}
+
+Is this proposition internally self-contradictory?""",
                 ),
             ]
         )
@@ -502,5 +708,83 @@ Is this set of propositions logically consistent?""",
         return ConsistencyResult(
             consistent=consistent,
             contradictions=contradictions,
+            reasoning=content[:500],
+        )
+
+    def _parse_equivalence_result(self, content: str) -> SemanticEquivalenceResult:
+        """Parse LLM response for semantic equivalence check with fallback strategies."""
+        try:
+            # Try direct JSON parsing
+            return self.equivalence_parser.parse(content)
+        except Exception:
+            # Fallback: regex extraction
+            return self._fallback_parse_equivalence(content)
+
+    def _fallback_parse_equivalence(self, content: str) -> SemanticEquivalenceResult:
+        """Fallback parser for equivalence results."""
+        # Try to extract JSON from markdown code blocks
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                return SemanticEquivalenceResult(**data)
+            except Exception:
+                pass
+
+        # Keyword-based extraction
+        equivalent = bool(
+            re.search(
+                r"\b(equivalent|same|identical|equal)\b",
+                content,
+                re.IGNORECASE,
+            )
+        )
+        if re.search(
+            r"\b(not equivalent|different|distinct)\b", content, re.IGNORECASE
+        ):
+            equivalent = False
+
+        return SemanticEquivalenceResult(
+            equivalent=equivalent,
+            reasoning=content[:500],
+        )
+
+    def _parse_self_contradiction_result(self, content: str) -> SelfContradictionResult:
+        """Parse LLM response for self-contradiction check with fallback strategies."""
+        try:
+            # Try direct JSON parsing
+            return self.self_contradiction_parser.parse(content)
+        except Exception:
+            # Fallback: regex extraction
+            return self._fallback_parse_self_contradiction(content)
+
+    def _fallback_parse_self_contradiction(self, content: str) -> SelfContradictionResult:
+        """Fallback parser for self-contradiction results."""
+        # Try to extract JSON from markdown code blocks
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                return SelfContradictionResult(**data)
+            except Exception:
+                pass
+
+        # Keyword-based extraction
+        self_contradictory = bool(
+            re.search(
+                r"\b(self-contradictory|contradictory|contradiction|mutually exclusive|impossible|cannot be true)\b",
+                content,
+                re.IGNORECASE,
+            )
+        )
+        if re.search(
+            r"\b(not self-contradictory|not contradictory|consistent|coherent|possible)\b",
+            content,
+            re.IGNORECASE
+        ):
+            self_contradictory = False
+
+        return SelfContradictionResult(
+            self_contradictory=self_contradictory,
             reasoning=content[:500],
         )
