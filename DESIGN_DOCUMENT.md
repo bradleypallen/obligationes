@@ -1576,4 +1576,3 @@ While the implementation follows Novaes' formalization closely, there are some d
 
 These differences adapt the medieval formal system to modern LLM capabilities while preserving the logical structure and game-theoretic properties described by Dutilh Novaes.
 
-## 3. System Architecture
