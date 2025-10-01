@@ -1,7 +1,7 @@
 """
 Unit tests for agent implementations.
 
-Tests validate the behavior of Respondent, Opponent, and Judge agents.
+Tests validate the behavior of Respondent and Opponent agents.
 """
 
 from unittest.mock import Mock
@@ -10,11 +10,9 @@ from dotenv import load_dotenv
 from obligationes.agents import (
     RespondentAgent,
     OpponentAgent,
-    JudgeAgent,
     OpponentStrategy,
     RespondentResponse,
     OpponentProposal,
-    JudgmentResult,
 )
 from obligationes.state import ObligationesState, ResponseType
 
@@ -136,59 +134,6 @@ class TestOpponentAgent:
         assert len(result["proposition"]) > 0
 
 
-class TestJudgeAgent:
-    """Tests for JudgeAgent."""
-
-    def test_initialization(self):
-        """Test creating Judge agent."""
-        agent = JudgeAgent()
-        assert agent.inference_engine is not None
-        assert agent.llm is not None
-
-    def test_judge_disputation_with_consistent_state(self):
-        """Test judging a disputation where Respondent maintains consistency."""
-        # Use real agent to test actual LLM interaction
-        agent = JudgeAgent()
-        state = ObligationesState()
-        state.set_positum("Socrates is mortal")
-        state.add_response("All men are mortal", ResponseType.CONCEDO, "Test", 5)
-        state.end_disputation("RESPONDENT", "Maintained consistency")
-
-        result = agent.judge_disputation(state)
-
-        assert "winner" in result
-        assert "reason" in result
-        assert isinstance(result["final_consistent"], bool)
-
-    def test_judge_disputation_with_inconsistent_state(self):
-        """Test judging a disputation where Respondent falls into contradiction."""
-        # Use real agent to test actual LLM interaction
-        agent = JudgeAgent()
-        state = ObligationesState()
-        state.set_positum("Socrates is mortal")
-        state.add_response("Socrates is immortal", ResponseType.CONCEDO, "Test", 1)
-
-        result = agent.judge_disputation(state)
-
-        assert "winner" in result
-        assert "reason" in result
-        # The consistency check should show contradiction
-        assert isinstance(result["final_consistent"], bool)
-
-    def test_format_transcript(self):
-        """Test transcript formatting."""
-        agent = JudgeAgent()
-        state = ObligationesState()
-        state.set_positum("Socrates is mortal")
-        state.add_response("All men are mortal", ResponseType.CONCEDO, "Test", 5)
-        state.add_response("Socrates is a man", ResponseType.CONCEDO, "Test", 5)
-
-        transcript = agent._format_transcript(state.history)
-
-        assert "Turn 0" in transcript
-        assert "All men are mortal" in transcript
-        assert "CONCEDO" in transcript
-
 
 class TestPydanticModels:
     """Tests for Pydantic models used by agents."""
@@ -258,11 +203,10 @@ class TestAgentInteraction:
         assert 1 <= evaluation["rule_applied"] <= 5
 
     def test_full_interaction_cycle(self):
-        """Test a complete interaction: Opponent → Respondent → Judge."""
+        """Test a complete interaction: Opponent → Respondent."""
         # Create agents
         opponent = OpponentAgent(strategy=OpponentStrategy.BALANCED)
         respondent = RespondentAgent()
-        judge = JudgeAgent()
 
         # Initialize state
         state = ObligationesState(common_knowledge={"All men are mortal"})
@@ -284,13 +228,10 @@ class TestAgentInteraction:
                 evaluation["rule_applied"],
             )
 
-        # Judge evaluates
-        judgment = judge.judge_disputation(state)
-
-        # Verify judgment structure
-        assert judgment["winner"] in ["OPPONENT", "RESPONDENT"]
-        assert len(judgment["reason"]) > 0
-        assert isinstance(judgment["final_consistent"], bool)
+        # Verify state was updated
+        assert state.turn_count == 4  # Positum + 3 turns
+        assert len(state.history) == 4
+        assert state.get_all_commitments()  # Has commitments
 
 
 class TestStrategyBehavior:
