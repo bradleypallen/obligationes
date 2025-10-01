@@ -5,13 +5,14 @@
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [System Architecture](#system-architecture)
-3. [Core Components](#core-components)
-4. [Implementation Details](#implementation-details)
-5. [API Reference](#api-reference)
-6. [Usage Examples](#usage-examples)
-7. [Testing and Validation](#testing-and-validation)
-8. [Deployment Considerations](#deployment-considerations)
+2. [Correspondence to Dutilh Novaes Formalization](#correspondence-to-dutilh-novaes-formalization)
+3. [System Architecture](#system-architecture)
+4. [Core Components](#core-components)
+5. [Implementation Details](#implementation-details)
+6. [API Reference](#api-reference)
+7. [Usage Examples](#usage-examples)
+8. [Testing and Validation](#testing-and-validation)
+9. [Deployment Considerations](#deployment-considerations)
 
 ## 1. Introduction
 
@@ -68,9 +69,7 @@ Each layer can be modified independently, allowing for:
 - Various game strategies
 - Different persistence mechanisms
 
-## 2. System Architecture
-
-### 2.1 High-Level Architecture
+### 3.1 High-Level Architecture
 
 ```python
 # Core system components and their relationships
@@ -78,8 +77,7 @@ Each layer can be modified independently, allowing for:
 ObligationesSystem
 ├── DisputationManager (orchestrates the game)
 │   ├── OpponentAgent (proposes propositions)
-│   ├── RespondentAgent (evaluates and responds)
-│   └── JudgeAgent (evaluates the disputation)
+│   └── RespondentAgent (evaluates and responds)
 ├── LogicalReasoningEngine (LLM-based inference)
 │   ├── InferenceChain (checks logical consequence)
 │   ├── ConsistencyChain (detects contradictions)
@@ -96,7 +94,7 @@ ObligationesSystem
     └── OutputParsers (JSON response parsing)
 ```
 
-### 2.2 Data Flow
+### 3.2 Data Flow
 
 1. **Initialization Phase**
    ```
@@ -126,16 +124,15 @@ ObligationesSystem
    ConsistencyMonitor → Validate state → Continue or end game
    ```
 
-4. **Judgment Phase**
+4. **Outcome Determination Phase**
    ```
-   Judge → Analyze transcript → Evaluate rule compliance
-                             → Determine winner
-                             → Generate report
+   DisputationManager → Check for contradiction → Determine winner mechanically
+                                                → Record final state
    ```
 
-### 2.3 Key Design Decisions
+### 3.3 Key Design Decisions
 
-#### 2.3.1 LLM-Centric Logic
+#### 3.3.1 LLM-Centric Logic
 **Decision**: Use LLMs for all logical reasoning rather than symbolic engines.
 
 **Rationale**:
@@ -156,16 +153,17 @@ ObligationesSystem
 - Multiple validation passes
 - Explicit reasoning chains
 
-#### 2.3.2 Separation of Roles
-**Decision**: Implement Opponent, Respondent, and Judge as separate agents.
+#### 3.3.2 Separation of Roles
+**Decision**: Implement Opponent and Respondent as separate agents with mechanical winner determination.
 
 **Rationale**:
-- Clear separation of concerns
-- Different prompting strategies per role
-- Independent strategy development
-- Easier testing and validation
+- Clear separation of concerns between strategic and rule-based agents
+- Different prompting strategies per role (strategic vs. rule-following)
+- Opponent focuses on finding contradictions, Respondent on rule compliance
+- Winner determination is mechanical (no judgment needed)
+- Easier testing and validation of each component independently
 
-#### 2.3.3 State Immutability
+#### 3.3.3 State Immutability
 **Decision**: Treat state updates as immutable transitions.
 
 **Rationale**:
@@ -174,11 +172,11 @@ ObligationesSystem
 - Prevents accidental state corruption
 - Facilitates undo/redo functionality
 
-## 3. Core Components
+## 4. Core Components
 
-### 3.1 State Management
+### 4.1 State Management
 
-#### 3.1.1 Data Structures
+#### 4.1.1 Data Structures
 
 ```python
 from enum import Enum
@@ -210,7 +208,7 @@ class Proposition:
     inference_chain: Optional[str] = None  # How it was derived
 ```
 
-#### 3.1.2 State Container
+#### 4.1.2 State Container
 
 ```python
 class ObligationesState:
@@ -237,9 +235,9 @@ class ObligationesState:
         return commitments
 ```
 
-### 3.2 Logical Reasoning Engine
+### 4.2 Logical Reasoning Engine
 
-#### 3.2.1 LLM Configuration
+#### 4.2.1 LLM Configuration
 
 ```python
 class LLMInferenceEngine:
@@ -258,7 +256,7 @@ class LLMInferenceEngine:
         )
 ```
 
-#### 3.2.2 Inference Chain
+#### 4.2.2 Inference Chain
 
 The inference chain determines if a proposition follows necessarily from premises:
 
@@ -297,9 +295,9 @@ Output JSON:
     ])
 ```
 
-### 3.3 Rules Engine
+### 4.3 Rules Engine
 
-#### 3.3.1 Burley's Rules Implementation
+#### 4.3.1 Burley's Rules Implementation
 
 ```python
 class BurleyRulesEngine:
@@ -328,9 +326,9 @@ class BurleyRulesEngine:
 
 **Implementation Note**: The order of rules is crucial. Each rule must be evaluated completely before moving to the next. The LLM prompt must explicitly enforce this ordering.
 
-### 3.4 Agent Implementations
+### 4.4 Agent Implementations
 
-#### 3.4.1 Respondent Agent
+#### 4.4.1 Respondent Agent
 
 ```python
 class RespondentAgent:
@@ -360,7 +358,7 @@ class RespondentAgent:
         }
 ```
 
-#### 3.4.2 Opponent Agent
+#### 4.4.2 Opponent Agent
 
 ```python
 class OpponentAgent:
@@ -381,11 +379,11 @@ class OpponentAgent:
         }
 ```
 
-## 4. Implementation Details
+## 5. Implementation Details
 
-### 4.1 LangChain Integration
+### 5.1 LangChain Integration
 
-#### 4.1.1 Custom Memory Class
+#### 5.1.1 Custom Memory Class
 
 ```python
 from langchain.memory import BaseMemory
@@ -424,7 +422,7 @@ class ObligationesMemory(BaseMemory):
         self.state.turn_count += 1
 ```
 
-#### 4.1.2 Prompt Engineering
+#### 5.1.2 Prompt Engineering
 
 Prompts must be carefully structured for consistency:
 
@@ -450,9 +448,9 @@ If the rules force you into contradiction, you lose - but you must still follow 
     ])
 ```
 
-### 4.2 Error Handling
+### 5.2 Error Handling
 
-#### 4.2.1 LLM Response Parsing
+#### 5.2.1 LLM Response Parsing
 
 ```python
 def parse_llm_response(response: str) -> Dict:
@@ -490,7 +488,7 @@ def parse_llm_response(response: str) -> Dict:
     return result
 ```
 
-#### 4.2.2 Consistency Validation
+#### 5.2.2 Consistency Validation
 
 ```python
 def validate_response_consistency(response: ResponseType, 
@@ -520,9 +518,9 @@ def validate_response_consistency(response: ResponseType,
     }
 ```
 
-### 4.3 Performance Optimization
+### 5.3 Performance Optimization
 
-#### 4.3.1 Caching Strategy
+#### 5.3.1 Caching Strategy
 
 ```python
 from functools import lru_cache
@@ -551,7 +549,7 @@ class CachedInferenceEngine:
         return result["follows"]
 ```
 
-#### 4.3.2 Batch Processing
+#### 5.3.2 Batch Processing
 
 ```python
 async def evaluate_propositions_batch(propositions: List[str], 
@@ -570,9 +568,9 @@ async def evaluate_propositions_batch(propositions: List[str],
     return results
 ```
 
-## 5. API Reference
+## 6. API Reference
 
-### 5.1 Main Interface
+### 6.1 Main Interface
 
 ```python
 class DisputationManager:
@@ -610,7 +608,7 @@ class DisputationManager:
         """Load a disputation from a saved transcript."""
 ```
 
-### 5.2 Result Types
+### 6.2 Result Types
 
 ```python
 @dataclass
@@ -622,7 +620,7 @@ class DisputationResult:
     total_turns: int                     # Number of turns completed
     final_consistent: bool               # Final consistency state
     transcript: List[Dict[str, Any]]     # Complete exchange history
-    judgment: Dict[str, Any]             # Detailed judge analysis
+    judgment: Dict[str, Any]             # Basic outcome summary
     state: ObligationesState             # Final game state
     started_at: str                      # ISO timestamp
     ended_at: str                        # ISO timestamp
@@ -639,7 +637,7 @@ class Turn:
     rule_applied: int
 ```
 
-### 5.3 Configuration
+### 6.3 Configuration
 
 ```python
 @dataclass
@@ -653,9 +651,9 @@ class DisputationConfig:
     temperature: float = 0.0
 ```
 
-## 6. Usage Examples
+## 7. Usage Examples
 
-### 6.1 Basic Usage (Implemented)
+### 7.1 Basic Usage (Implemented)
 
 ```python
 from obligationes.manager import DisputationManager, DisputationConfig, create_disputation
@@ -678,7 +676,7 @@ for turn in result.transcript:
         print(f"Contradiction at turn {turn['turn']}: {turn['proposition']}")
 ```
 
-### 6.2 Custom Configuration (Implemented)
+### 7.2 Custom Configuration (Implemented)
 
 ```python
 from obligationes.manager import DisputationManager, DisputationConfig
@@ -713,7 +711,7 @@ manager = DisputationManager(
 result = manager.run_disputation(positum="The Pope is not in Rome")
 ```
 
-### 6.3 Interactive Mode
+### 7.3 Interactive Mode
 
 ```python
 class InteractiveDisputation:
@@ -762,7 +760,7 @@ class InteractiveDisputation:
             print("Time's up! You maintained consistency and win!")
 ```
 
-### 6.4 Analysis Tools
+### 7.4 Analysis Tools
 
 ```python
 class DisputationAnalyzer:
@@ -806,9 +804,9 @@ class DisputationAnalyzer:
         return StrategyComparison(results)
 ```
 
-## 7. Testing and Validation
+## 8. Testing and Validation
 
-### 7.1 Unit Tests
+### 8.1 Unit Tests
 
 ```python
 import pytest
@@ -856,7 +854,7 @@ class TestInferenceEngine:
         assert "error" in result[1].lower()
 ```
 
-### 7.2 Integration Tests
+### 8.2 Integration Tests
 
 ```python
 class TestDisputation:
@@ -873,7 +871,7 @@ class TestDisputation:
         
         assert result.winner in ["OPPONENT", "RESPONDENT"]
         assert len(result.transcript) <= 5
-        assert result.judgment is not None
+        assert result.final_consistent in [True, False]
     
     def test_contradiction_detection(self):
         """Test that contradictions end the game."""
@@ -903,7 +901,7 @@ class TestDisputation:
         assert rule_num == 1
 ```
 
-### 7.3 Validation Suite
+### 8.3 Validation Suite
 
 ```python
 class ValidationSuite:
@@ -938,9 +936,9 @@ class ValidationSuite:
         )
 ```
 
-## 8. Deployment Considerations
+## 9. Deployment Considerations
 
-### 8.1 Production Configuration
+### 9.1 Production Configuration
 
 ```python
 # production_config.py
@@ -976,7 +974,7 @@ class ProductionConfig:
     MAX_PROPOSITION_LENGTH = 500
 ```
 
-### 8.2 API Deployment
+### 9.2 API Deployment
 
 ```python
 # api.py
@@ -1013,7 +1011,11 @@ async def run_disputation(request: DisputationRequest):
             winner=result.winner,
             reason=result.reason,
             transcript=[turn.dict() for turn in result.transcript],
-            analysis=result.judgment
+            analysis={
+                "winner": result.winner,
+                "reason": result.reason,
+                "final_consistent": result.final_consistent
+            }
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1026,7 +1028,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-### 8.3 Docker Deployment
+### 9.3 Docker Deployment
 
 ```dockerfile
 # Dockerfile
@@ -1068,7 +1070,7 @@ services:
       - "6379:6379"
 ```
 
-### 8.4 Monitoring and Logging
+### 9.4 Monitoring and Logging
 
 ```python
 import logging
@@ -1126,7 +1128,7 @@ class DisputationLogger:
         }))
 ```
 
-### 8.5 Performance Metrics
+### 9.5 Performance Metrics
 
 ```python
 from dataclasses import dataclass
@@ -1170,9 +1172,17 @@ class PerformanceMetrics:
         )
 ```
 
-## Conclusion
+## 10. Conclusion
 
-This implementation provides a sophisticated, LLM-based system for conducting medieval obligationes disputations. By leveraging modern AI capabilities while respecting the formal structure of medieval logic, we create a system that is both historically faithful and practically powerful.
+This implementation provides a sophisticated, LLM-based system for conducting medieval obligationes disputations. By leveraging modern AI capabilities while respecting the formal structure of medieval logic described by Dutilh Novaes, we create a system that is both historically faithful and practically powerful.
+
+The implementation maintains strict correspondence to Novaes' formalization while adapting it to modern LLM capabilities. Key achievements include:
+
+1. **Faithful Formalization**: Direct mapping of R(φ), Γₙ, and Kc to code structures
+2. **Correct Semantics**: Proper handling of NEGO as commitment to negation (Γₙ = Γₙ₋₁ ∪ {¬φ})
+3. **Strategic Depth**: Multi-turn planning for Opponent that exploits logical tensions
+4. **Consistency Maintenance**: Full commitment set checking with De Morgan transformations
+5. **Rule Compliance**: Mechanical application of Burley's 5 rules in strict precedence order
 
 The architecture's separation of concerns, comprehensive error handling, and extensive testing infrastructure ensure a robust, maintainable system suitable for both research and educational applications.
 
@@ -1186,3 +1196,384 @@ The architecture's separation of concerns, comprehensive error handling, and ext
 6. **Web interface**: Interactive UI for educational use
 
 The system demonstrates how classical logical frameworks can be revitalized through modern AI, creating new opportunities for understanding historical philosophical practices and developing novel approaches to automated reasoning.
+
+## 2. Correspondence to Dutilh Novaes Formalization
+
+This section maps our implementation to the formal model presented in Catarina Dutilh Novaes' "Medieval Obligationes as Logical Games of Consistency Maintenance" (2005).
+
+### 2.1 Core Formalization
+
+Dutilh Novaes models obligationes as a game between two players with a response function **R** that maps propositions to {0, 1, ?}:
+
+- **R(φ) = 1**: Accept the proposition (CONCEDO)
+- **R(φ) = 0**: Reject the proposition (NEGO)
+- **R(φ) = ?**: Neither accept nor reject (DUBITO)
+
+**Implementation Mapping:**
+
+```python
+# state.py:15-24
+class ResponseType(Enum):
+    """Possible responses in obligationes disputation."""
+    CONCEDO = "concedo"  # R(φ) = 1
+    NEGO = "nego"        # R(φ) = 0
+    DUBITO = "dubito"    # R(φ) = ?
+```
+
+### 2.2 Positum Acceptance Rule
+
+**Novaes (p. 376)**: "R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if and only if self-contradictory)"
+
+The Respondent must reject a self-contradictory positum and accept a non-self-contradictory one.
+
+**Implementation:**
+
+```python
+# manager.py:151-211
+# Turn 0: Check if positum is self-contradictory (per Novaes 2005)
+# R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if self-contradictory)
+# R(φ₀) = 1 iff φ₀ ⊬⊥ (accept if not self-contradictory)
+
+positum_self_contradictory, contradiction_reasoning = (
+    self.inference_engine.is_self_contradictory(positum)
+)
+
+if positum_self_contradictory:
+    # Positum is self-contradictory - reject it
+    # Respondent wins by correctly rejecting invalid positum
+    return DisputationResult(
+        winner="RESPONDENT",
+        reason="Positum was self-contradictory and correctly rejected",
+        ...
+    )
+
+# Positum is not self-contradictory - accept it
+self.state.set_positum(positum)
+self.state.add_response(
+    positum,
+    ResponseType.CONCEDO,
+    "The positum is not self-contradictory and is accepted by obligation.",
+    0,  # Rule 0 = positum acceptance
+)
+```
+
+### 2.3 Commitment Set Updates
+
+**Novaes (p. 376)**: The commitment set Γₙ is updated based on responses:
+
+- **If R(φ) = 1 (CONCEDO)**: Γₙ = Γₙ₋₁ ∪ {φ}
+- **If R(φ) = 0 (NEGO)**: Γₙ = Γₙ₋₁ ∪ {¬φ}
+- **If R(φ) = ? (DUBITO)**: Γₙ = Γₙ₋₁
+
+**Critical insight**: When NEGO is used, the Respondent commits to the **negation** of the proposition, not just to not accepting it.
+
+**Implementation:**
+
+```python
+# state.py:192-234
+def add_response(
+    self,
+    proposition: str,
+    response: ResponseType,
+    reasoning: str,
+    rule_applied: int,
+) -> None:
+    """Record a response and update state accordingly."""
+    prop = Proposition(
+        content=proposition,
+        status=self._response_to_status(response),
+        turn_introduced=self.turn_count,
+    )
+
+    # Add to appropriate set
+    if response == ResponseType.CONCEDO:
+        self.concessa.add(prop)  # Γₙ = Γₙ₋₁ ∪ {φ}
+    elif response == ResponseType.NEGO:
+        self.negata.add(prop)    # Γₙ = Γₙ₋₁ ∪ {¬φ} - stored as negata
+    elif response == ResponseType.DUBITO:
+        self.dubitata.add(prop)  # Γₙ = Γₙ₋₁
+```
+
+```python
+# state.py:236-256
+def get_all_commitments(self) -> Set[str]:
+    """Get all propositions the Respondent is committed to (positum + concessa)."""
+    commitments = set()
+    if self.positum:
+        commitments.add(self.positum.content)
+    commitments.update(p.content for p in self.concessa)
+    return commitments
+
+def get_all_negations(self) -> Set[str]:
+    """Get all propositions the Respondent has denied (negata = ¬φ for each NEGO)."""
+    return {p.content for p in self.negata}
+```
+
+### 2.4 Consistency Checking with Negations
+
+**Novaes formalization**: The consistency check must account for both positive commitments and negated commitments from NEGO responses.
+
+**Implementation:**
+
+```python
+# manager.py:248-273
+# Check consistency
+# Build full commitment set: CONCEDO + negation of NEGO
+all_commitments = self.state.get_all_commitments()
+all_negations = self.state.get_all_negations()
+
+# Add negated versions of NEGO responses to the commitment set
+full_commitment_set = all_commitments.copy()
+for negated_prop in all_negations:
+    full_commitment_set.add(f"NOT({negated_prop})")
+
+if len(full_commitment_set) > 1:
+    consistent, contradictions, reasoning = (
+        self.inference_engine.check_consistency(full_commitment_set)
+    )
+
+    if not consistent:
+        contradiction_found = True
+        # Mark in history
+        self.state.history[-1].consistency_maintained = False
+        break
+    else:
+        self.state.history[-1].consistency_maintained = True
+```
+
+The LLM-based consistency checker explicitly handles NOT() notation:
+
+```python
+# inference.py:105-125 (consistency chain system prompt)
+"""You are an expert in formal logic and consistency analysis.
+
+NOTATION:
+- "NOT(P)" means the negation of proposition P
+- If you see both "P" and "NOT(P)", that's a direct contradiction
+- "NOT(A and B)" is logically equivalent to "NOT(A) or NOT(B)" (De Morgan's law)
+- "NOT(A or B)" is logically equivalent to "NOT(A) and NOT(B)" (De Morgan's law)
+
+Check for:
+1. Direct contradictions: "P" and "NOT(P)" in the set
+2. Indirect contradictions: Derived through valid inference (modus ponens, etc.)
+3. De Morgan contradictions: e.g., "NOT(A and B)" with "NOT(A or B)"
+4. Circular contradictions: A chain of inferences leading to contradiction
+
+Pay special attention to De Morgan's laws when analyzing NOT() propositions
+"""
+```
+
+### 2.5 Common Knowledge (Kc)
+
+**Novaes (p. 376)**: "Kc is the common state of knowledge of those present at the disputation. It is an incomplete model, in the sense that some propositions do not receive a truth-value."
+
+Kc includes:
+- Common sense knowledge
+- Religious dogmas
+- Circumstantially available information
+- All participants agree on Kc
+
+**Implementation:**
+
+```python
+# manager.py:52-62
+# Default medieval common knowledge
+DEFAULT_COMMON_KNOWLEDGE = {
+    "All men are mortal",
+    "God is omnipotent",
+    "The soul is immortal",
+    "Fire rises naturally",
+    "Heavy objects fall faster than light ones",
+    "The Earth is at the center of the universe",
+    "All effects have causes",
+    "Contradictions cannot be true",
+}
+
+# manager.py:86-102
+def __init__(
+    self,
+    common_knowledge: Optional[Set[str]] = None,
+    config: Optional[DisputationConfig] = None,
+    inference_engine: Optional[LLMInferenceEngine] = None,
+):
+    """Initialize the disputation manager.
+
+    Args:
+        common_knowledge: Background facts both parties accept (uses default if None)
+    """
+    # Use provided or default common knowledge
+    if common_knowledge is None:
+        common_knowledge = DEFAULT_COMMON_KNOWLEDGE.copy()
+
+    # Initialize state
+    self.state = ObligationesState(common_knowledge=common_knowledge)
+```
+
+Common knowledge is used in Burley's Rules 3-5:
+
+```python
+# rules.py (conceptual - actual implementation uses LLM prompts)
+# Rule 3: If φ follows from (positum + concessa + Kc) → CONCEDO
+# Rule 4: If φ incompatible with (positum + concessa + Kc) → NEGO
+# Rule 5: Otherwise, respond based on truth value in Kc
+```
+
+### 2.6 Burley's Rules as Response Function
+
+**Novaes (p. 376-377)**: Burley's rules define the response function R in order of precedence.
+
+**Implementation:**
+
+```python
+# rules.py:40-115 (BurleyRulesEngine.evaluate_proposition)
+def evaluate_proposition(
+    self, proposition: str, state: ObligationesState
+) -> Tuple[ResponseType, str, int]:
+    """
+    Apply Burley's rules in strict order:
+
+    1. If proposition follows from (positum + concessa) → CONCEDO
+    2. If proposition incompatible with (positum + concessa) → NEGO
+    3. If proposition follows from (positum + concessa + Kc) → CONCEDO
+    4. If proposition incompatible with (positum + concessa + Kc) → NEGO
+    5. Otherwise, respond based on truth in Kc
+
+    Returns: (ResponseType, reasoning, rule_number)
+    """
+
+    # Get current commitments
+    commitments = state.get_all_commitments()
+    common_knowledge = state.common_knowledge
+
+    # RULE 1: Check if follows from commitments alone
+    if commitments:
+        follows, reasoning = self.inference_engine.follows_from(
+            proposition, commitments
+        )
+        if follows:
+            return (ResponseType.CONCEDO, f"Rule 1: {reasoning}", 1)
+
+    # RULE 2: Check if incompatible with commitments
+    if commitments:
+        incompatible, reasoning = self.inference_engine.incompatible_with(
+            proposition, commitments
+        )
+        if incompatible:
+            return (ResponseType.NEGO, f"Rule 2: {reasoning}", 2)
+
+    # RULE 3: Check if follows from commitments + common knowledge
+    if commitments and common_knowledge:
+        combined = commitments.union(common_knowledge)
+        follows, reasoning = self.inference_engine.follows_from(
+            proposition, combined
+        )
+        if follows:
+            return (ResponseType.CONCEDO, f"Rule 3: {reasoning}", 3)
+
+    # RULE 4: Check if incompatible with commitments + common knowledge
+    if commitments and common_knowledge:
+        combined = commitments.union(common_knowledge)
+        incompatible, reasoning = self.inference_engine.incompatible_with(
+            proposition, combined
+        )
+        if incompatible:
+            return (ResponseType.NEGO, f"Rule 4: {reasoning}", 4)
+
+    # RULE 5: Respond based on truth in common knowledge
+    is_true, reasoning = self.inference_engine.is_known(
+        proposition, common_knowledge
+    )
+    if is_true:
+        return (ResponseType.CONCEDO, f"Rule 5: {reasoning}", 5)
+    else:
+        return (ResponseType.NEGO, f"Rule 5: {reasoning}", 5)
+```
+
+### 2.7 Winner Determination
+
+**Novaes**: The game ends when the Respondent is forced into contradiction (Γₙ ⊢⊥). The Opponent wins if a contradiction is reached, the Respondent wins if consistency is maintained.
+
+**Implementation:**
+
+```python
+# manager.py:279-287
+# Determine outcome
+if contradiction_found:
+    winner = "OPPONENT"
+    reason = "Respondent fell into contradiction"
+else:
+    winner = "RESPONDENT"
+    reason = "Maintained consistency through all turns"
+
+self.state.end_disputation(winner, reason)
+```
+
+### 2.8 Self-Contradiction Detection
+
+**Novaes**: A single proposition φ is self-contradictory if φ ⊢⊥ (it entails contradiction on its own).
+
+**Implementation:**
+
+```python
+# inference.py:217-241
+class SelfContradictionResult(BaseModel):
+    """Result of checking if a single proposition is self-contradictory."""
+    self_contradictory: bool = Field(
+        description="Whether the proposition is internally self-contradictory"
+    )
+    reasoning: str = Field(
+        description="Explanation of why it is or is not self-contradictory"
+    )
+
+def is_self_contradictory(self, proposition: str) -> Tuple[bool, str]:
+    """
+    Check if a single proposition is internally self-contradictory.
+
+    A proposition is self-contradictory if it contains mutually exclusive claims:
+    - "Socrates is both mortal and immortal"
+    - "X is true and X is false"
+    - "The square circle exists"
+
+    This implements Novaes' positum rejection rule: R(φ₀) = 0 iff φ₀ ⊢⊥
+    """
+    result = self._self_contradiction_chain.invoke({
+        "proposition": proposition,
+        "format_instructions": self.self_contradiction_parser.get_format_instructions(),
+    })
+    content = result.content if hasattr(result, "content") else str(result)
+    parsed = self._parse_self_contradiction_result(content)
+    return parsed.self_contradictory, parsed.reasoning
+```
+
+### 2.9 Summary of Correspondence
+
+| Novaes Formalization | Implementation |
+|---------------------|----------------|
+| R(φ) = 1 | `ResponseType.CONCEDO` |
+| R(φ) = 0 | `ResponseType.NEGO` |
+| R(φ) = ? | `ResponseType.DUBITO` |
+| φ₀ (positum) | `state.positum` |
+| Γₙ (commitment set) | `state.get_all_commitments() ∪ NOT(state.get_all_negations())` |
+| Kc (common knowledge) | `state.common_knowledge` / `DEFAULT_COMMON_KNOWLEDGE` |
+| R(φ₀) = 0 iff φ₀ ⊢⊥ | `is_self_contradictory()` check in Turn 0 |
+| Γₙ = Γₙ₋₁ ∪ {φ} when R(φ) = 1 | `state.concessa.add(prop)` |
+| Γₙ = Γₙ₋₁ ∪ {¬φ} when R(φ) = 0 | `state.negata.add(prop)` + consistency check with `NOT()` |
+| Burley's Rules 1-5 | `BurleyRulesEngine.evaluate_proposition()` |
+| Consistency check (Γₙ ⊬⊥) | `inference_engine.check_consistency()` with De Morgan handling |
+| Opponent wins if Γₙ ⊢⊥ | `contradiction_found = True` → `winner = "OPPONENT"` |
+| Respondent wins if Γₙ ⊬⊥ | No contradiction after max turns → `winner = "RESPONDENT"` |
+
+### 2.10 Key Implementation Differences
+
+While the implementation follows Novaes' formalization closely, there are some differences:
+
+1. **LLM-based Logic**: Novaes uses formal logical consequence (⊢), we use LLM-based inference with natural language
+2. **Strategic Planning**: Our Opponent uses multi-turn planning not discussed in Novaes
+3. **Trap Detection**: Respondent can detect traps (for informational purposes) but cannot avoid them
+4. **Explicit NOT() Notation**: We use `NOT(P)` string notation to track negations in consistency checking
+5. **De Morgan Laws**: LLM explicitly handles De Morgan transformations in consistency checking
+6. **Turn 0**: We formalize positum acceptance as "Turn 0" with explicit rule application
+
+These differences adapt the medieval formal system to modern LLM capabilities while preserving the logical structure and game-theoretic properties described by Dutilh Novaes.
+
+## 3. System Architecture
