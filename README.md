@@ -26,27 +26,66 @@ In an obligationes disputation:
 
 ## Installation
 
+### Prerequisites
+
+- Python 3.11 or higher
+- pip (Python package installer)
+- An API key from OpenAI or Anthropic
+
+### Step 1: Clone the Repository
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/obligationes.git
+git clone https://github.com/bradleypallen/obligationes.git
 cd obligationes
+```
 
-# Create and activate virtual environment
+### Step 2: Create Virtual Environment
+
+```bash
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Activate virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+
+# On Windows:
+venv\Scripts\activate
+```
+
+### Step 3: Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-## Configuration
+### Step 4: Configure API Keys
 
-Create a `.env` file with your LLM API key:
+Create a `.env` file in the project root directory with your LLM API key:
+
+**For OpenAI (recommended for testing):**
+```bash
+OPENAI_API_KEY=sk-your-openai-api-key-here
+```
+
+**For Anthropic Claude:**
+```bash
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key-here
+```
+
+**Getting API Keys:**
+- **OpenAI**: Sign up at [platform.openai.com](https://platform.openai.com/), navigate to API keys, and create a new key
+- **Anthropic**: Sign up at [console.anthropic.com](https://console.anthropic.com/), navigate to API keys, and create a new key
+
+**Note**: The default model is `gpt-4o-mini` (fast and cost-effective). You can change this using the `--model` flag.
+
+### Step 5: Verify Installation
 
 ```bash
-OPENAI_API_KEY=your_key_here
-# OR
-ANTHROPIC_API_KEY=your_key_here
+# Run a simple test disputation
+python -m obligationes run "Socrates is mortal" --max-turns 3
+
+# If successful, you should see the disputation output
 ```
 
 ## Usage
@@ -89,16 +128,50 @@ python -m obligationes replay transcript.json
 python -m obligationes --help
 ```
 
-## Development Status
+## Troubleshooting
 
-- [x] **Phase 1**: Core state management and data structures
-- [x] **Phase 2**: LLM inference engine
-- [x] **Phase 3**: Rules engine (Burley's rules)
-- [x] **Phase 4**: Agent implementation (Opponent, Respondent)
-- [x] **Phase 5**: Disputation manager
-- [x] **Phase 6**: CLI interface
-- [x] **Phase 7**: Testing and validation
-- [ ] **Phase 8**: Documentation and polish
+### API Key Issues
+
+**Error: "No API key found"**
+- Ensure your `.env` file is in the project root directory (same level as `README.md`)
+- Check that the `.env` file contains the correct key name (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`)
+- Verify the API key is valid and not expired
+- Make sure there are no extra spaces or quotes around the key in the `.env` file
+
+**Error: "Authentication failed"**
+- Double-check your API key is correct
+- For OpenAI keys, they should start with `sk-`
+- For Anthropic keys, they should start with `sk-ant-`
+- Ensure your API account has credits/billing set up
+
+### Model Selection
+
+**Choosing a model:**
+```bash
+# Use OpenAI's GPT-4o-mini (default, fast and cheap)
+python -m obligationes run "Test" --model gpt-4o-mini --vendor openai
+
+# Use OpenAI's GPT-4 (slower but more capable)
+python -m obligationes run "Test" --model gpt-4 --vendor openai
+
+# Use Anthropic's Claude
+python -m obligationes run "Test" --model claude-3-5-sonnet-20241022 --vendor anthropic
+```
+
+### Import Errors
+
+**Error: "ModuleNotFoundError"**
+- Make sure your virtual environment is activated
+- Run `pip install -r requirements.txt` again
+- Check you're using Python 3.11 or higher: `python --version`
+
+### Performance
+
+**Tests or disputations running slowly:**
+- The default model (`gpt-4o-mini`) is optimized for speed
+- Reduce `--max-turns` for faster execution
+- Each LLM API call adds latency; expect 1-3 seconds per turn
+- Full test suite takes ~17 minutes with `gpt-4o-mini`
 
 ## Testing
 
