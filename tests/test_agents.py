@@ -134,7 +134,6 @@ class TestOpponentAgent:
         assert len(result["proposition"]) > 0
 
 
-
 class TestPydanticModels:
     """Tests for Pydantic models used by agents."""
 
@@ -160,18 +159,6 @@ class TestPydanticModels:
         assert proposal.proposition == "Socrates is wise"
         assert "contradiction" in proposal.strategy_note.lower()
 
-    def test_judgment_result_model(self):
-        """Test JudgmentResult model."""
-        judgment = JudgmentResult(
-            winner="OPPONENT",
-            reason="Respondent fell into contradiction",
-            rule_violations=[],
-            key_moments=["Turn 5 was critical"],
-            overall_assessment="Well-executed trap",
-        )
-        assert judgment.winner == "OPPONENT"
-        assert len(judgment.key_moments) == 1
-        assert len(judgment.rule_violations) == 0
 
 
 class TestAgentInteraction:

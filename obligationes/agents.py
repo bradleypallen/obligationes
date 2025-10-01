@@ -6,14 +6,14 @@ This module implements the two key participants in an obligationes disputation:
 - OpponentAgent: Proposes propositions strategically to force contradictions
 """
 
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, Tuple
 from enum import Enum
 from pydantic import BaseModel, Field
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 
-from obligationes.state import ObligationesState, ResponseType, Turn
+from obligationes.state import ObligationesState, ResponseType
 from obligationes.rules import BurleyRulesEngine
 from obligationes.inference import LLMInferenceEngine
 
@@ -265,12 +265,16 @@ class OpponentAgent:
                     return True
             return False
 
-        while is_semantically_duplicate(proposal.proposition, proposed_already) and retry_count < max_retries:
+        while (
+            is_semantically_duplicate(proposal.proposition, proposed_already)
+            and retry_count < max_retries
+        ):
             retry_count += 1
             import sys
+
             print(
                 f"⚠️  Opponent repeated proposition (attempt {retry_count}): '{proposal.proposition}'",
-                file=sys.stderr
+                file=sys.stderr,
             )
             # Regenerate with explicit rejection of the repeated proposition
             result = self._proposal_chain.invoke(
@@ -279,7 +283,8 @@ class OpponentAgent:
                     "strategic_plan": self.strategic_plan,
                     "commitments": commitments_text,
                     "negations": negations_text,
-                    "proposed_already": proposed_text + f"\n- {proposal.proposition} (JUST ATTEMPTED - DO NOT USE)",
+                    "proposed_already": proposed_text
+                    + f"\n- {proposal.proposition} (JUST ATTEMPTED - DO NOT USE)",
                     "turn_count": state.turn_count,
                     "format_instructions": self.parser.get_format_instructions(),
                 }
@@ -290,9 +295,10 @@ class OpponentAgent:
         # Final check: if still repeated after retries, add warning to strategy note
         if is_semantically_duplicate(proposal.proposition, proposed_already):
             import sys
+
             print(
                 f"⚠️  WARNING: Opponent still repeated after {max_retries} retries: '{proposal.proposition}'",
-                file=sys.stderr
+                file=sys.stderr,
             )
             proposal.strategy_note = (
                 f"[WARNING: Repeated proposition after {max_retries} retries] "
@@ -445,7 +451,10 @@ Create a concise strategic plan (3-5 sentences) that:
 - Explains why this sequence should work
 """,
                 ),
-                ("human", "Analyze the positum and create a strategic plan to force contradiction."),
+                (
+                    "human",
+                    "Analyze the positum and create a strategic plan to force contradiction.",
+                ),
             ]
         )
 
@@ -491,5 +500,3 @@ Create a concise strategic plan (3-5 sentences) that:
                 strategy_note="Generated from fallback parsing",
                 expected_response="UNKNOWN",
             )
-
-

@@ -219,7 +219,9 @@ def run(
         # R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if self-contradictory)
         # R(φ₀) = 1 iff φ₀ ⊬⊥ (accept if not self-contradictory)
         print_turn("0 (Positum)")
-        click.echo(f"{Colors.BOLD}{Colors.RED}Opponent proposes:{Colors.RESET} {positum}")
+        click.echo(
+            f"{Colors.BOLD}{Colors.RED}Opponent proposes:{Colors.RESET} {positum}"
+        )
 
         # Check if positum is self-contradictory
         positum_self_contradictory, contradiction_reasoning = (
@@ -236,22 +238,30 @@ def run(
                 0,  # Rule 0 = positum rejection
             )
             print_contradiction()
-            click.echo(f"\n{Colors.BOLD}{Colors.RED}DISPUTATION CANNOT BEGIN - POSITUM REJECTED{Colors.RESET}")
+            click.echo(
+                f"\n{Colors.BOLD}{Colors.RED}DISPUTATION CANNOT BEGIN - POSITUM REJECTED{Colors.RESET}"
+            )
 
             # End timing
             manager.end_time = __import__("datetime").datetime.utcnow()
 
             # Show rejection result - Respondent wins by correctly rejecting invalid positum
             print_header("FINAL RESULT")
-            click.echo(f"{Colors.BOLD}Winner:{Colors.RESET} {Colors.GREEN}{Colors.BOLD}RESPONDENT{Colors.RESET}")
-            click.echo(f"{Colors.BOLD}Reason:{Colors.RESET} Positum was self-contradictory and correctly rejected")
+            click.echo(
+                f"{Colors.BOLD}Winner:{Colors.RESET} {Colors.GREEN}{Colors.BOLD}RESPONDENT{Colors.RESET}"
+            )
+            click.echo(
+                f"{Colors.BOLD}Reason:{Colors.RESET} Positum was self-contradictory and correctly rejected"
+            )
             click.echo(f"\n{Colors.CYAN}{'='*70}{Colors.RESET}\n")
 
             # Save transcript if requested
             if output:
                 output_path = Path(output)
                 manager.save_transcript(str(output_path))
-                click.echo(f"\n{Colors.GREEN}✓{Colors.RESET} Transcript saved to {output_path}")
+                click.echo(
+                    f"\n{Colors.GREEN}✓{Colors.RESET} Transcript saved to {output_path}"
+                )
 
             return
 
@@ -344,13 +354,15 @@ def run(
         manager.state.end_disputation(winner, reason)
 
         # Print final result
-        print_judgment({
-            "winner": winner,
-            "reason": reason,
-            "overall_assessment": f"Disputation completed with {manager.state.turn_count} turns.",
-            "key_moments": [],
-            "rule_violations": [],
-        })
+        print_judgment(
+            {
+                "winner": winner,
+                "reason": reason,
+                "overall_assessment": f"Disputation completed with {manager.state.turn_count} turns.",
+                "key_moments": [],
+                "rule_violations": [],
+            }
+        )
 
         # Show timing
         duration = (manager.end_time - manager.start_time).total_seconds()

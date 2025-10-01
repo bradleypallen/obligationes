@@ -309,9 +309,7 @@ class LLMInferenceEngine:
         except Exception as e:
             return False, f"Error in self-contradiction check: {str(e)}"
 
-    def semantically_equivalent(
-        self, prop1: str, prop2: str
-    ) -> Tuple[bool, str]:
+    def semantically_equivalent(self, prop1: str, prop2: str) -> Tuple[bool, str]:
         """
         Check if two propositions are semantically equivalent.
 
@@ -758,7 +756,9 @@ Is this proposition internally self-contradictory?""",
             # Fallback: regex extraction
             return self._fallback_parse_self_contradiction(content)
 
-    def _fallback_parse_self_contradiction(self, content: str) -> SelfContradictionResult:
+    def _fallback_parse_self_contradiction(
+        self, content: str
+    ) -> SelfContradictionResult:
         """Fallback parser for self-contradiction results."""
         # Try to extract JSON from markdown code blocks
         json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
@@ -780,7 +780,7 @@ Is this proposition internally self-contradictory?""",
         if re.search(
             r"\b(not self-contradictory|not contradictory|consistent|coherent|possible)\b",
             content,
-            re.IGNORECASE
+            re.IGNORECASE,
         ):
             self_contradictory = False
 

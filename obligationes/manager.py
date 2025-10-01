@@ -151,7 +151,7 @@ class DisputationManager:
         # R(φ₀) = 0 iff φ₀ ⊢⊥ (reject if self-contradictory)
         # R(φ₀) = 1 iff φ₀ ⊬⊥ (accept if not self-contradictory)
         if self.config.verbose:
-            print(f"\n--- Turn 0 (Positum) ---\n")
+            print("\n--- Turn 0 (Positum) ---\n")
             print(f"Opponent proposes: {positum}")
 
         # Check if positum is self-contradictory
@@ -164,9 +164,11 @@ class DisputationManager:
         if positum_self_contradictory:
             # Positum is self-contradictory - reject it
             if self.config.verbose:
-                print(f"\nRespondent: NEGO")
-                print(f"Reasoning: The positum is self-contradictory and cannot be defended. {contradiction_reasoning}")
-                print(f"Rule Applied: Positum rejection (self-contradictory)")
+                print("\nRespondent: NEGO")
+                print(
+                    f"Reasoning: The positum is self-contradictory and cannot be defended. {contradiction_reasoning}"
+                )
+                print("Rule Applied: Positum rejection (self-contradictory)")
                 print("\n❌ DISPUTATION CANNOT BEGIN - POSITUM REJECTED")
 
             # End immediately - no game starts
@@ -197,9 +199,11 @@ class DisputationManager:
 
         # Positum is not self-contradictory - accept it
         if self.config.verbose:
-            print(f"\nRespondent: CONCEDO")
-            print(f"Reasoning: The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position.")
-            print(f"Rule Applied: Positum acceptance (non-contradictory)")
+            print("\nRespondent: CONCEDO")
+            print(
+                "Reasoning: The positum is not self-contradictory and is accepted by obligation. The Respondent commits to defend this position."
+            )
+            print("Rule Applied: Positum acceptance (non-contradictory)")
 
         # Set positum and record the CONCEDO response
         self.state.set_positum(positum)
