@@ -230,7 +230,7 @@ The system makes extensive use of LLM API calls:
 - A typical 10-turn disputation makes ~20-30 API calls
 - Uses temperature=0 for deterministic responses
 - Recommend using `gpt-4o-mini` for faster, cheaper testing
-- The test suite (102 tests) takes ~15 minutes with `gpt-4o-mini`
+- The test suite (97 tests) takes ~17 minutes with `gpt-4o-mini`
 
 ## Contributing
 
