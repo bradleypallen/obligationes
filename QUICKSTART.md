@@ -6,7 +6,7 @@ Get started with medieval dialectical disputations in 5 minutes!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/obligationes.git
+git clone https://github.com/bradleypallen/obligationes.git
 cd obligationes
 
 # Create and activate virtual environment
@@ -40,7 +40,7 @@ python -m obligationes run "Socrates is immortal" --max-turns 3
 You'll see:
 1. **Opponent** proposes challenging propositions
 2. **Respondent** responds following Burley's rules (CONCEDO/NEGO/DUBITO)
-3. **Judge** determines the winner based on logical consistency
+3. **Winner** determined mechanically based on logical consistency (contradiction = Opponent wins)
 
 ## Example Output
 
@@ -69,12 +69,13 @@ Rule Applied: Rule 2
 ...
 
 ======================================================================
-                             JUDGMENT
+                           FINAL RESULT
 ======================================================================
 
 Winner: RESPONDENT
 Reason: Maintained consistency through all turns
-...
+
+No contradiction detected in commitment set.
 ```
 
 ## Common Commands
@@ -143,14 +144,14 @@ python -m obligationes run "Socrates is mortal" --max-turns 10
 ### Different LLM Models
 
 ```bash
-# Use GPT-4 (default)
-python -m obligationes run "Truth exists" --model gpt-4
-
-# Use GPT-4 Turbo (faster)
-python -m obligationes run "Truth exists" --model gpt-4-turbo
-
-# Use GPT-4o-mini (fastest, cheapest)
+# Use GPT-4o-mini (default - fast and cheap)
 python -m obligationes run "Truth exists" --model gpt-4o-mini
+
+# Use GPT-4 (more capable, slower)
+python -m obligationes run "Truth exists" --model gpt-4 --vendor openai
+
+# Use Claude Sonnet (Anthropic)
+python -m obligationes run "Truth exists" --model claude-3-5-sonnet-20241022 --vendor anthropic
 ```
 
 ### Disable Colors
@@ -194,9 +195,9 @@ Error: The api_key client option must be set...
 
 **Solution**: Make sure your `.env` file is in the project root with your API key.
 
-### Tests Timing Out
+### Tests Taking Long
 
-If running tests with `pytest`, they may take 15-20 minutes due to real LLM calls. This is normal.
+If running tests with `pytest`, they may take ~17 minutes due to real LLM calls. This is normal. The test suite uses gpt-4o-mini for speed and cost efficiency.
 
 ### Import Errors
 
