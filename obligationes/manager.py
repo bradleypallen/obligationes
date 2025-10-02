@@ -310,6 +310,7 @@ class DisputationManager:
                 "winner": winner,
                 "reason": reason,
                 "final_consistent": not contradiction_found,
+                "overall_assessment": f"Disputation completed with {self.state.turn_count} turns.",
             },
             state=self.state,
             started_at=self.start_time.isoformat(),

@@ -93,6 +93,22 @@ class SelfContradictionResult(BaseModel):
     )
 
 
+class TruthValueResult(BaseModel):
+    """Result of checking the truth value of a proposition in reality."""
+
+    truth_value: str = Field(
+        description="The truth value: 'true', 'false', or 'unknown'"
+    )
+    confidence: float = Field(
+        description="Confidence in the assessment (0.0-1.0)",
+        ge=0.0,
+        le=1.0,
+    )
+    reasoning: str = Field(
+        description="Explanation for the truth value assessment"
+    )
+
+
 class LLMInferenceEngine:
     """
     LLM-based logical reasoning engine.
@@ -171,6 +187,9 @@ class LLMInferenceEngine:
         self.self_contradiction_parser = PydanticOutputParser(
             pydantic_object=SelfContradictionResult
         )
+        self.truth_value_parser = PydanticOutputParser(
+            pydantic_object=TruthValueResult
+        )
 
         # Create chains
         self._follows_chain = self._create_follows_chain()
@@ -178,6 +197,7 @@ class LLMInferenceEngine:
         self._consistency_chain = self._create_consistency_chain()
         self._equivalence_chain = self._create_equivalence_chain()
         self._self_contradiction_chain = self._create_self_contradiction_chain()
+        self._truth_value_chain = self._create_truth_value_chain()
 
     def follows_from(
         self, proposition: str, premises: Set[str]
@@ -308,6 +328,40 @@ class LLMInferenceEngine:
 
         except Exception as e:
             return False, f"Error in self-contradiction check: {str(e)}"
+
+    def evaluate_truth_value(
+        self, proposition: str, context: str = ""
+    ) -> Tuple[str, float, str]:
+        """
+        Evaluate the truth value of a proposition based on common sense and reality.
+
+        This is used for Burley's Rule 5 to determine if a proposition is true,
+        false, or unknown in reality (not just in the explicit common knowledge set).
+
+        Args:
+            proposition: The proposition to evaluate
+            context: Optional context about the disputation (e.g., "about medieval philosophy")
+
+        Returns:
+            Tuple of (truth_value, confidence, reasoning) where truth_value is
+            'true', 'false', or 'unknown'
+        """
+        try:
+            result = self._truth_value_chain.invoke(
+                {
+                    "proposition": proposition,
+                    "context": context if context else "General common sense reasoning",
+                    "format_instructions": self.truth_value_parser.get_format_instructions(),
+                }
+            )
+
+            # Parse the result
+            content = result.content if hasattr(result, "content") else str(result)
+            parsed = self._parse_truth_value_result(content)
+            return parsed.truth_value, parsed.confidence, parsed.reasoning
+
+        except Exception as e:
+            return "unknown", 0.0, f"Error in truth value evaluation: {str(e)}"
 
     def semantically_equivalent(self, prop1: str, prop2: str) -> Tuple[bool, str]:
         """
@@ -593,6 +647,60 @@ Is this proposition internally self-contradictory?""",
 
         return prompt | self.llm
 
+    def _create_truth_value_chain(self) -> Any:
+        """Create the chain for checking truth value in reality."""
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are an expert in evaluating the truth value of propositions based on common sense and general knowledge.
+
+Your task is to determine if a proposition is TRUE, FALSE, or UNKNOWN in reality/common sense.
+
+CRITICAL GUIDELINES:
+- TRUE: The proposition is almost certainly true based on common sense, general knowledge, or obvious facts
+- FALSE: The proposition is almost certainly false based on common sense, general knowledge, or obvious facts
+- UNKNOWN: Cannot determine truth value without specific contextual information
+
+Examples of TRUE propositions:
+1. "The sky is blue" (generally true in common experience)
+2. "Most people are not the Pope" (obvious statistical fact)
+3. "Water is wet" (definitional truth)
+4. "2+2=4" (mathematical truth)
+
+Examples of FALSE propositions:
+1. "The sky is green" (contradicts common experience)
+2. "Most people are the Pope" (obviously false)
+3. "Fire is cold" (contradicts common knowledge)
+
+Examples of UNKNOWN propositions:
+1. "Socrates is in Rome" (depends on specific context/time)
+2. "The cat is on the mat" (depends on which cat, which mat, when)
+3. "It will rain tomorrow" (depends on location, time)
+
+IMPORTANT FOR CONTEXT-DEPENDENT PROPOSITIONS:
+- For propositions about specific individuals (e.g., "You are the Pope"), use common sense
+- Most people are NOT famous figures, kings, popes, etc.
+- Assume ordinary circumstances unless otherwise indicated
+- Use statistical likelihood: "You are the Pope" is almost certainly FALSE
+- "You are in [specific city]" may be UNKNOWN without context
+
+{format_instructions}""",
+                ),
+                (
+                    "human",
+                    """Proposition: {proposition}
+
+Background context (if any): {context}
+
+What is the truth value of this proposition in reality/common sense?""",
+                ),
+            ]
+        )
+
+        return prompt | self.llm
+
     def _parse_follows_result(self, content: str) -> FollowsFromResult:
         """Parse LLM response for follows_from check with fallback strategies."""
         try:
@@ -777,6 +885,15 @@ Is this proposition internally self-contradictory?""",
             # Fallback: regex extraction
             return self._fallback_parse_self_contradiction(content)
 
+    def _parse_truth_value_result(self, content: str) -> TruthValueResult:
+        """Parse LLM response for truth value check with fallback strategies."""
+        try:
+            # Try direct JSON parsing
+            return self.truth_value_parser.parse(content)
+        except Exception:
+            # Fallback: regex extraction
+            return self._fallback_parse_truth_value(content)
+
     def _fallback_parse_self_contradiction(
         self, content: str
     ) -> SelfContradictionResult:
@@ -807,5 +924,36 @@ Is this proposition internally self-contradictory?""",
 
         return SelfContradictionResult(
             self_contradictory=self_contradictory,
+            reasoning=content[:500],
+        )
+
+    def _fallback_parse_truth_value(self, content: str) -> TruthValueResult:
+        """Fallback parser for truth value results."""
+        # Try to extract JSON from markdown code blocks
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                return TruthValueResult(**data)
+            except Exception:
+                pass
+
+        # Keyword-based extraction
+        content_lower = content.lower()
+
+        # Check for truth value
+        if re.search(r"\b(is true|true in reality|certainly true|obviously true)\b", content_lower):
+            truth_value = "true"
+            confidence = 0.8
+        elif re.search(r"\b(is false|false in reality|certainly false|obviously false)\b", content_lower):
+            truth_value = "false"
+            confidence = 0.8
+        else:
+            truth_value = "unknown"
+            confidence = 0.5
+
+        return TruthValueResult(
+            truth_value=truth_value,
+            confidence=confidence,
             reasoning=content[:500],
         )

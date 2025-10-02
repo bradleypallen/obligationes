@@ -128,6 +128,8 @@ class TestRule1:
         # Low confidence - should not trigger rule
         mock_inference.follows_from.return_value = (True, "Maybe follows", 0.5)
         mock_inference.incompatible_with.return_value = (False, "Not incompatible", 0.1)
+        # Truth value for Rule 5
+        mock_inference.evaluate_truth_value.return_value = ("unknown", 0.5, "Cannot determine")
 
         engine = BurleyRulesEngine(inference_engine=mock_inference)
         state = ObligationesState(common_knowledge={"Background fact"})
@@ -300,6 +302,8 @@ class TestRule5:
         # Nothing follows, nothing incompatible
         mock_inference.follows_from.return_value = (False, "Doesn't follow", 0.1)
         mock_inference.incompatible_with.return_value = (False, "Not incompatible", 0.1)
+        # Truth value unknown for irrelevant proposition
+        mock_inference.evaluate_truth_value.return_value = ("unknown", 0.5, "Cannot determine truth value")
 
         engine = BurleyRulesEngine(inference_engine=mock_inference)
         state = ObligationesState(common_knowledge={"All men are mortal"})
@@ -319,6 +323,8 @@ class TestRule5:
         # Mock all the calls that will happen in rules 1-4
         mock_inference.follows_from.return_value = (False, "Doesn't follow", 0.1)
         mock_inference.incompatible_with.return_value = (False, "Not incompatible", 0.1)
+        # Truth value unknown when no common knowledge
+        mock_inference.evaluate_truth_value.return_value = ("unknown", 0.5, "Cannot determine truth value")
 
         engine = BurleyRulesEngine(inference_engine=mock_inference)
         state = ObligationesState()  # No common knowledge
@@ -331,7 +337,6 @@ class TestRule5:
         assert rule == 5
         assert response == ResponseType.DUBITO
         assert "RULE 5" in reasoning
-        assert "no common knowledge" in reasoning.lower()
 
 
 class TestEmptyState:
@@ -361,6 +366,8 @@ class TestEmptyState:
     def test_evaluate_with_no_common_knowledge_no_commitments(self):
         """Test evaluation with completely empty state."""
         mock_inference = Mock()
+        # Truth value for Rule 5
+        mock_inference.evaluate_truth_value.return_value = ("unknown", 0.5, "Cannot determine")
 
         engine = BurleyRulesEngine(inference_engine=mock_inference)
         state = ObligationesState()  # Completely empty

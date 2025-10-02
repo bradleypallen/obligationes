@@ -224,15 +224,20 @@ class BurleyRulesEngine:
         self, proposition: str, common_knowledge: Set[str]
     ) -> Tuple[ResponseType, str, int]:
         """
-        Rule 5: Respond based on truth in common knowledge alone
+        Rule 5: Respond based on truth in reality/common sense
 
         This is the default fallback rule. If none of the previous rules apply,
         the Respondent responds based on whether the proposition is true or false
-        in common knowledge.
+        in reality, using both the explicit common knowledge set AND general
+        common sense reasoning.
 
-        If the proposition follows from common knowledge → CONCEDO
-        If the proposition is incompatible with common knowledge → NEGO
-        Otherwise → DUBITO (doubt/irrelevant)
+        Process:
+        1. Check if proposition follows from explicit common knowledge → CONCEDO
+        2. Check if proposition incompatible with explicit common knowledge → NEGO
+        3. Evaluate truth value using common sense/reality:
+           - If clearly true → CONCEDO
+           - If clearly false → NEGO
+           - If genuinely unknown/indeterminate → DUBITO
 
         Args:
             proposition: Proposition to check
@@ -241,44 +246,56 @@ class BurleyRulesEngine:
         Returns:
             (ResponseType, reasoning, 5) - always returns a response
         """
-        if not common_knowledge:
-            # No common knowledge, so proposition is irrelevant
-            explanation = (
-                "RULE 5: No common knowledge available. "
-                "Proposition is irrelevant to the disputation."
+        # First check explicit common knowledge
+        if common_knowledge:
+            # Check if it follows from common knowledge
+            follows, follows_reasoning, follows_confidence = (
+                self.inference_engine.follows_from(proposition, common_knowledge)
             )
-            return (ResponseType.DUBITO, explanation, 5)
 
-        # Check if it follows from common knowledge
-        follows, follows_reasoning, follows_confidence = (
-            self.inference_engine.follows_from(proposition, common_knowledge)
+            if follows and follows_confidence > 0.7:
+                explanation = (
+                    f"RULE 5: Proposition follows from common knowledge (granted as true). "
+                    f"{follows_reasoning}"
+                )
+                return (ResponseType.CONCEDO, explanation, 5)
+
+            # Check if it's incompatible with common knowledge
+            incompatible, incompat_reasoning, incompat_confidence = (
+                self.inference_engine.incompatible_with(proposition, common_knowledge)
+            )
+
+            if incompatible and incompat_confidence > 0.7:
+                explanation = (
+                    f"RULE 5: Proposition incompatible with common knowledge (denied as false). "
+                    f"{incompat_reasoning}"
+                )
+                return (ResponseType.NEGO, explanation, 5)
+
+        # Not determined by explicit common knowledge - use common sense/reality
+        truth_value, confidence, reasoning = (
+            self.inference_engine.evaluate_truth_value(proposition)
         )
 
-        if follows and follows_confidence > 0.7:
+        if truth_value == "true" and confidence > 0.7:
             explanation = (
-                f"RULE 5: Proposition follows from common knowledge (granted as true). "
-                f"{follows_reasoning}"
+                f"RULE 5: Proposition is true in reality/common sense (granted). "
+                f"{reasoning}"
             )
             return (ResponseType.CONCEDO, explanation, 5)
-
-        # Check if it's incompatible with common knowledge
-        incompatible, incompat_reasoning, incompat_confidence = (
-            self.inference_engine.incompatible_with(proposition, common_knowledge)
-        )
-
-        if incompatible and incompat_confidence > 0.7:
+        elif truth_value == "false" and confidence > 0.7:
             explanation = (
-                f"RULE 5: Proposition incompatible with common knowledge (denied as false). "
-                f"{incompat_reasoning}"
+                f"RULE 5: Proposition is false in reality/common sense (denied). "
+                f"{reasoning}"
             )
             return (ResponseType.NEGO, explanation, 5)
-
-        # Neither follows nor incompatible - doubt it
-        explanation = (
-            "RULE 5: Proposition neither follows from nor contradicts common knowledge. "
-            "It is irrelevant to the disputation."
-        )
-        return (ResponseType.DUBITO, explanation, 5)
+        else:
+            # Genuinely unknown/indeterminate
+            explanation = (
+                f"RULE 5: Proposition cannot be determined as true or false. "
+                f"{reasoning}"
+            )
+            return (ResponseType.DUBITO, explanation, 5)
 
     def explain_rules(self) -> str:
         """
