@@ -458,6 +458,25 @@ NOTATION:
 - "NOT(A and B)" is logically equivalent to "NOT(A) or NOT(B)" (De Morgan's law)
 - "NOT(A or B)" is logically equivalent to "NOT(A) and NOT(B)" (De Morgan's law)
 
+CONDITIONAL STATEMENTS (CRITICAL):
+- "If A then B" is logically equivalent to "NOT(A) or B"
+- "NOT(A) → B" and "NOT(B) → A" are BOTH equivalent to "A or B"
+- "NOT(A) → NOT(B)" and "NOT(B) → NOT(A)" are BOTH equivalent to "A or B"
+- These are NOT contradictions - they're logically equivalent!
+
+IMPORTANT LOGICAL EQUIVALENCES:
+- "A or B" ≡ "If not A, then B" ≡ "If not B, then A"
+- "NOT(A) → B" ≡ "NOT(B) → NOT(NOT(A))" ≡ "NOT(B) → A"
+- Multiple conditionals can be consistent even if they form a logical chain
+
+EXAMPLE OF CONSISTENT CONDITIONALS:
+Given: "A or B" (exactly one is true)
+These are ALL consistent with each other:
+- "If not A, then B" (¬A → B)
+- "If not B, then A" (¬B → A)
+- "If A, then not B" (A → ¬B)
+- "If B, then not A" (B → ¬A)
+
 Check for:
 1. Direct contradictions: "P" and "NOT(P)" in the set
 2. Indirect contradictions: Derived through valid inference (modus ponens, etc.)
@@ -469,6 +488,8 @@ IMPORTANT:
 - A set is inconsistent if ANY contradiction exists
 - Report ALL contradictory pairs found
 - Pay special attention to De Morgan's laws when analyzing NOT() propositions
+- DO NOT flag logically equivalent conditionals as contradictions
+- Check if there exists ANY truth assignment that makes ALL propositions true
 
 {format_instructions}""",
                 ),
