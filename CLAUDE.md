@@ -40,7 +40,7 @@ The system uses a **layered architecture** with clear separation of concerns:
 ### Installation
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/obligationes.git
+git clone https://github.com/bradleypallen/obligationes.git
 cd obligationes
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
@@ -50,7 +50,7 @@ pip install -r requirements.txt
 ### Dependencies
 - Python 3.11+
 - **LLM**: langchain, langchain-openai, langchain-anthropic
-- **CLI**: click
+- **CLI**: argparse (built-in), colorama
 - **Testing**: pytest, pytest-cov
 - **Data**: pydantic
 - **Environment**: python-dotenv
@@ -127,7 +127,7 @@ The `ObligationesState` maintains:
 - `obligationes/manager.py`: DisputationManager orchestrator (✅ complete)
 - `obligationes/cli.py`: Command-line interface with colored output (✅ complete)
 - `obligationes/__main__.py`: Package entry point (✅ complete)
-- `tests/`: Unit and integration tests with pytest (✅ 102 tests, all passing)
+- `tests/`: Unit and integration tests with pytest (✅ 97 tests, all passing)
 - `tests/conftest.py`: Test configuration (uses gpt-4o-mini for faster testing)
 
 ## CLI Usage
@@ -153,20 +153,22 @@ python -m obligationes --help                  # Show all commands
 **Options:**
 - `--max-turns, -t`: Maximum number of turns (default: 10)
 - `--strategy, -s`: Opponent strategy: balanced, aggressive, pedagogical (default: balanced)
-- `--model, -m`: LLM model to use (default: gpt-4)
+- `--model, -m`: LLM model to use (default: gpt-4o-mini)
+- `--vendor, -v`: LLM vendor: openai, anthropic (default: openai)
 - `--output, -o`: Save transcript to JSON file
 - `--quiet, -q`: Suppress verbose output (only show final judgment)
 - `--no-color`: Disable colored output
 
 ## Testing Strategy
 
-**Implemented Test Suite** (102 tests, all passing):
+**Implemented Test Suite** (97 tests, all passing in ~17 minutes):
 - **Unit Tests**: Individual inference patterns, rule precedence, state management
 - **Integration Tests**: Complete disputation flows with both agents
 - **Agent Tests**: Respondent rule-following, Opponent strategy and planning
 - **Manager Tests**: Full orchestration, transcript save/load, status tracking, mechanical winner determination
 - **Real LLM Testing**: All tests use real API calls (gpt-4o-mini for speed)
 - **Code Quality**: black, mypy, ruff all passing
+- **Performance**: Optimized tests use 2 turns instead of 3 for faster execution
 
 ## Medieval Context
 
